@@ -1,0 +1,108 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Phone caller</title>
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <script src="//netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+    <script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
+    <style>
+        .btn {
+            width: 40%;
+        }
+
+        .panel panel-default {
+            border-left: 0px;
+        }
+
+        .table-fixed thead {
+            width: 97%;
+        }
+
+        .table-fixed tbody {
+            height: 310px;
+            overflow-y: auto;
+            width: 100%;
+        }
+
+        .table-fixed thead, .table-fixed tbody, .table-fixed tr, .table-fixed td, .table-fixed th {
+            display: block;
+        }
+
+        .table-fixed tbody td, .table-fixed thead > tr > th {
+
+            border-bottom-width: 0;
+        }
+    </style>
+    <script src="http://10.0.0.23:5000/socket.io/socket.io.js"></script>
+    <script>var socket</script>
+    <script type="text/javascript">
+        function reply_click(clicked_id){
+            alert("В нижнем фрейме должна обновиться информация!!!");
+        }
+    </script>
+    <script type="text/javascript">
+        function call_click(clicked_id){
+            socket.emit('callCandidate', clicked_id);
+        }
+    </script>
+    <script>
+        onload = function(){
+            socket = io.connect('http://10.0.0.23:5000');
+        }
+    </script>
+
+</head>
+<body>
+<div class="container">
+    <div class="row">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4>
+                    Fixed Header Scrolling Table
+                </h4>
+            </div>
+            <table class="table table-fixed">
+                <thead>
+                <tr>
+                    <th class="col-xs-1">Ф.И.О</th>
+                    <th class="col-xs-1">Возраст</th>
+                    <th class="col-xs-1">Место жительства</th>
+                    <th class="col-xs-1">Опыт работы</th>
+                    <th class="col-xs-4">Навыки</th>
+                    <th class="col-xs-1">Зарплата</th>
+                    <th class="col-xs-1">Коментарий</th>
+                    <th class="col-xs-1">Телефон</th>
+                    <th class="col-xs-1">Кнопки</th>
+                </tr>
+                </thead>
+                <tbody>
+                <% candidates.forEach(function (item) { %>
+                <tr>
+                    <td class="col-xs-1"> <%= item.name %> </td>
+                    <td class="col-xs-1"> <%= item.age %> </td>
+                    <td class="col-xs-1"> <%= item.addrLocation %> </td>
+                    <td class="col-xs-1"> <%= item.lavel_year %> </td>
+                    <td class="col-xs-4"> <%= item.key_level %> </td>
+                    <td class="col-xs-1"> <%= item.salary %> </td>
+                    <td class="col-xs-1"> <%= item.m_comment %> </td>
+                    <td class="col-xs-1"> <%= item.telephone %> </td>
+                    <td class="col-xs-1">
+                        <button id="<%= item.id %>" type="button" class="btn btn-default btn-sm" onClick="reply_click(this.id)">
+                            <span class="glyphicon glyphicon-list-alt"></span>
+                        </button>
+                        <button id="<%= item.id %>" type="button" class="btn btn-default btn-sm" onClick="call_click(this.id)">
+                            <span class="glyphicon glyphicon-play-circle"></span>
+                        </button>
+                        <button id="<%= item.id %>" type="button" class="btn btn-default btn-sm" onClick="reply_click(this.id)">
+                            <span class="glyphicon glyphicon-flag"></span>
+                        </button>
+                    </td>
+                </tr>
+                <% }); %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>
