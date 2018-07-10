@@ -42,10 +42,11 @@ app.get('/candidateTable.ejs', function (req, res) {
     var pg = require('pg');
     var client = new pg.Client(conString);
     client.connect();
-    const query = client.query('SELECT * FROM public.resume', (err, result) => {
-        res.render('candidateTable.ejs', {candidates: result.rows});
+    const query = client.query('SELECT json_agg(*) FROM public.resume', (err, result) => {
+        res.render('candidateTable.ejs', {candidates: result.rows[0].json_agg});
     })
 });
+app.get('')
 app.get('/profile.ejs', function (req, res) {
     res.render('profile.ejs', {candidates: null});
 });
