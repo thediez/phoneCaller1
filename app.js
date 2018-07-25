@@ -7,24 +7,24 @@ var io = require('socket.io').listen(app.listen(port));
 app.use(express.static(__dirname + '/public'));
 var socketList = [];
 var id;
+const {Pool} = require('pg');
+const connectionString = 'postgres://postgres:Radius123@109.188.79.65:5432/hh_resume';
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
-app.get('/', function (req, res) {
-
-});
-
-const {Pool} = require('pg');
-const connectionString = 'postgres://postgres:Radius123@109.188.79.65:5432/hh_resume';
-
+//Instantiate new pool of connections
 const pool = new Pool({
     connectionString: connectionString,
 });
 
-app.post('/setComment', function (req, res) {
+//This method is for home directory
+app.get('/', function (req, res) {
 
 });
 
+// This method is for filtering and get list of candidates
+//example http://localhost:5000/profile?offset=10&limit=10&from_date=2017-07-10T19:00:00.000Z&to_date=2018-07-16T19:00:00.000Z&key_level=Java&w_sign=0
+//example http://localhost:5000/profile - gets list of all candidates
 app.get('/profile', function (req, res) {
     var first = true;
     var limit = false;
@@ -81,7 +81,7 @@ app.get('/profile', function (req, res) {
         }
     }
     pool.query(query, (err, result) => {
-        if(typeof result.rows != "undefined"){
+        if (typeof result.rows != "undefined") {
             res.send(result.rows);
         } else {
             res.send("NOTHING FOUND");
@@ -89,79 +89,126 @@ app.get('/profile', function (req, res) {
     })
 });
 
+// This method is for getting html page by id
+//example http://localhost:5000/profileHTML/5168
+app.get('/profileHTML/:id', function (req, res) {
+    const id = req.params.id;
+    pool.query('SELECT resume_page FROM public.resume WHERE id=' + id, (err, result) => {
+        res.send(result.rows[0]);
+    });
+});
+
+// This method is for write comments by id
+//example http://localhost:5000/comments/5168  put data into body text field
+app.put('/comments/:id', (req, res) => {
+    const id = req.params.id;
+    const data = req.body.text;
+    var querys = "UPDATE public.resume SET m_comment='" + data + "' WHERE id=" + id;
+    pool.query(querys, (err, result) => {
+        res.send("GOT IT");
+    });
+});
+
+// This method is for calling candidate
+//example http://localhost:5000/call/5168
+app.put('/call/:id', (req, res) => {
+    const id = req.params.id;
+    pool.query('SELECT telephone FROM public.resume WHERE id=' + id, (err, result) => {
+        io.on('connection', function (socket) {
+            socket.to(socketList[0]).emit('callServer', {
+                "phoneNumber": res.rows[0].telephone,
+            })
+        });
+        res.send("GOT IT");
+    });
+});
+
 // Initialize a new socket.io application
+// I use sockets for android application for me is most efficient way
+// Please check showCalling when event comes from android application , server emits to web part data about calling telephone
 var presentation = io.on('connection', function (socket) {
     console.log("client connected: " + socket.id);
+
+    // little hack, bad idea need to rework
     socket.emit('checkIfAndroid', true);
+
+    // little hack, bad idea need to rework
     socket.on('checkIfAndroid', function (flag) {
         if (flag == true) {
             socketList.push(socket.id);
         }
     });
+
+    //This method listen and emits data from db to android application
     socket.on('getNextPhone', function (count) {
         pool.query('SELECT * FROM public.resume WHERE w_sign = 0', (err, result) => {
             socket.emit('getPhone', {
-                "phoneNumber": res.rows[count].telephone,
-                "name": res.rows[count].name,
-                "age": res.rows[count].age,
-                "location": res.rows[count].addrLocation,
-                "salary": res.rows[count].salary,
-                "skills": res.rows[count].key_level,
-                "lenght": res.rows.length
+                "phoneNumber": result.rows[count].telephone,
+                "name": result.rows[count].name,
+                "age": result.rows[count].age,
+                "location": result.rows[count].addrLocation,
+                "salary": result.rows[count].salary,
+                "skills": result.rows[count].key_level,
+                "lenght": result.rows.length
             });
-            pool.end();
         });
     });
 
-    // put audio in to bd
+    //This method is for showing information about incoming number if number exist in db and emit to web if number found
+    socket.on('showCalling', function (incomingNumber) {
+        pool.query('SELECT * FROM public.resume WHERE telephone = ' + incomingNumber, (err, result) => {
+            if (typeof result.rows != "undefined") {
+                socket.to(socketList[0]).emit('showCvByIncomingNumber', {
+                    "phoneNumber": result.rows[0].telephone,
+                })
+            } else {
+                console.log("NOTHING FOUND");
+            };
+        });
+    });
+
+    // put audio in to bd need to rework
     socket.on('audio', function (im) {
         pool.query('SELECT * FROM public.resume WHERE w_sign = 0', (err, result) => {
-            pool.end();
+
         });
     });
 
-    //
-    socket.on('showCalling', function (incomingNumber) {
-        const query = client.query('SELECT * FROM public.resume WHERE telephone = ' + incomingNumber, (err, res) => {
-
-        })
-    });
-
-    socket.on('callCandidate', function (candidateId) {
-        // var conString = "postgres://postgres:Radius123@10.0.0.4:5432/hh_resume";
-        var conString = "postgres://postgres:Radius123@109.188.79.65:5432/hh_resume";
-        var pg = require('pg');
-        var client = new pg.Client(conString);
-        client.connect();
-        const query = client.query('SELECT * FROM public.resume WHERE id = ' + candidateId, (err, res) => {
-            socket.to(socketList[0]).emit('callServer', {
-                "phoneNumber": res.rows[0].telephone,
-            })
-        })
-    })
+    // socket.on('callCandidate', function (candidateId) {
+    //     // var conString = "postgres://postgres:Radius123@10.0.0.4:5432/hh_resume";
+    //     var conString = "postgres://postgres:Radius123@109.188.79.65:5432/hh_resume";
+    //     var pg = require('pg');
+    //     var client = new pg.Client(conString);
+    //     client.connect();
+    //     const query = client.query('SELECT * FROM public.resume WHERE id = ' + candidateId, (err, res) => {
+    //         socket.to(socketList[0]).emit('callServer', {
+    //             "phoneNumber": res.rows[0].telephone,
+    //         })
+    //     })
+    // })
 
     // Clients send the 'slide-changed' message whenever they navigate to a new slide.
-    socket.on('message', function (buttonId) {
-        if (buttonId.indexOf("info") >= 0) {
-            id = buttonId.substring(5);
-            var conString = "postgres://postgres:Radius123@109.188.79.65:5432/hh_resume";
-            // var conString = "postgres://postgres:Radius123@10.0.0.4:5432/hh_resume";
-            var pg = require('pg');
-            var client = new pg.Client(conString);
-            client.connect();
-            const query = client.query('SELECT * FROM public.resume WHERE id = ' + id, (err, result) => {
-                app.get('/profile.ejs', function (req, res) {
-                    res.render('profile.ejs', {candidates: result.rows});
-                })
-            });
-        } else if (buttonId.indexOf("call") >= 0) {
-            id = buttonId.substring(5);
-            console.log(id);
-        } else if (buttonId.indexOf("comment") >= 0) {
-            id = buttonId.substring(8);
-            console.log(id);
-        }
-    });
+    // socket.on('message', function (buttonId) {
+    //     if (buttonId.indexOf("info") >= 0) {
+    //         id = buttonId.substring(5);
+    //         var conString = "postgres://postgres:Radius123@109.188.79.65:5432/hh_resume";
+    //         // var conString = "postgres://postgres:Radius123@10.0.0.4:5432/hh_resume";
+    //         var pg = require('pg');
+    //         var client = new pg.Client(conString);
+    //         client.connect();
+    //         const query = client.query('SELECT * FROM public.resume WHERE id = ' + id, (err, result) => {
+    //             app.get('/profile.ejs', function (req, res) {
+    //                 res.render('profile.ejs', {candidates: result.rows});
+    //             })
+    //         });
+    //     } else if (buttonId.indexOf("call") >= 0) {
+    //         id = buttonId.substring(5);
+    //         console.log(id);
+    //     } else if (buttonId.indexOf("comment") >= 0) {
+    //         id = buttonId.substring(8);
+    //         console.log(id);
+    //     }
+    // });
 });
 
 console.log('Your presentation is running on http://localhost:' + port);
